@@ -25,6 +25,7 @@ import android.text.TextUtils;
 import android.util.DisplayMetrics;
 import android.util.TypedValue;
 import android.view.Gravity;
+import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
@@ -43,9 +44,11 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 public class MainActivity extends Activity {
@@ -59,6 +62,7 @@ public class MainActivity extends Activity {
 
     static class Entry {
         String label;
+        String pkg;
         Drawable icon;
         Intent intent;
         boolean settings;
@@ -70,13 +74,18 @@ public class MainActivity extends Activity {
     int cols;
     int iconSize;
     int selected = 0;
+    boolean organizing = false;
+    boolean picked = false;
     FrameLayout root;
     ImageView photoView;
     View scrim;
     GridView grid;
     TextView clock;
+    TextView hint;
     BaseAdapter adapter;
+    final List<Entry> all = new ArrayList<>();
     final List<Entry> entries = new ArrayList<>();
+    Set<String> hidden = new HashSet<>();
     final Handler ui = new Handler(Looper.getMainLooper());
 
     final Runnable tick = new Runnable() {
@@ -100,6 +109,7 @@ public class MainActivity extends Activity {
         prefs = getSharedPreferences("aero", MODE_PRIVATE);
         dp = getResources().getDisplayMetrics().density;
         cols = prefs.getInt("cols", 10);
+        hidden = new HashSet<>(prefs.getStringSet("hidden", new HashSet<String>()));
 
         root = new FrameLayout(this);
         root.setClipChildren(false);
@@ -124,6 +134,15 @@ public class MainActivity extends Activity {
         clock.setShadowLayer(8, 0, 2, 0x88000000);
         clock.setPadding((int) (56 * dp), (int) (28 * dp), 0, 0);
         column.addView(clock, new LinearLayout.LayoutParams(WRAP, WRAP));
+
+        hint = new TextView(this);
+        hint.setTextColor(0xFFFFE08A);
+        hint.setTextSize(TypedValue.COMPLEX_UNIT_PX, 16 * dp);
+        hint.setShadowLayer(6, 0, 2, 0x88000000);
+        hint.setPadding((int) (56 * dp), (int) (4 * dp), 0, 0);
+        hint.setText("MODO ORGANIZAR: OK pega ou solta o app · setas movem · VOLTAR termina");
+        hint.setVisibility(View.GONE);
+        column.addView(hint, new LinearLayout.LayoutParams(WRAP, WRAP));
 
         grid = new GridView(this);
         grid.setSelector(new ColorDrawable(Color.TRANSPARENT));
@@ -199,16 +218,24 @@ public class MainActivity extends Activity {
                     new int[]{0x4DFFFFFF, 0x1AFFFFFF});
             bg.setCornerRadius(18 * dp);
             setBackground(bg);
-            setFocusLook(false);
+            setLook(false, false);
         }
 
-        void setFocusLook(boolean f) {
-            bg.setColors(f ? new int[]{0x99FFFFFF, 0x40FFFFFF} : new int[]{0x4DFFFFFF, 0x1AFFFFFF});
-            bg.setStroke((int) ((f ? 3 : 1) * dp), f ? 0xFF8FEBFF : 0x44FFFFFF);
-            float s = f ? 1.12f : 1f;
+        void setLook(boolean f, boolean p) {
+            if (p) {
+                bg.setColors(new int[]{0xCCFFFFFF, 0x66FFFFFF});
+                bg.setStroke((int) (4 * dp), 0xFFFFC857);
+            } else if (f) {
+                bg.setColors(new int[]{0x99FFFFFF, 0x40FFFFFF});
+                bg.setStroke((int) (3 * dp), 0xFF8FEBFF);
+            } else {
+                bg.setColors(new int[]{0x4DFFFFFF, 0x1AFFFFFF});
+                bg.setStroke((int) (1 * dp), 0x44FFFFFF);
+            }
+            float s = p ? 1.2f : (f ? 1.12f : 1f);
             setScaleX(s);
             setScaleY(s);
-            setTranslationZ(f ? 12 * dp : 0);
+            setTranslationZ((f || p) ? 12 * dp : 0);
             label.setTypeface(f ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT);
         }
     }
@@ -235,7 +262,7 @@ public class MainActivity extends Activity {
             Entry e = entries.get(i);
             c.icon.setImageDrawable(e.icon);
             c.label.setText(e.label);
-            c.setFocusLook(i == selected);
+            c.setLook(i == selected, organizing && picked && i == selected);
             return c;
         }
     }
@@ -245,7 +272,8 @@ public class MainActivity extends Activity {
         for (int i = 0; i < grid.getChildCount(); i++) {
             View v = grid.getChildAt(i);
             if (v instanceof Cell) {
-                ((Cell) v).setFocusLook(first + i == selected);
+                int pos = first + i;
+                ((Cell) v).setLook(pos == selected, organizing && picked && pos == selected);
             }
         }
     }
@@ -271,6 +299,7 @@ public class MainActivity extends Activity {
                     String pkg = ri.activityInfo.packageName;
                     if (pkg.equals(self) || !seen.add(pkg)) continue;
                     Entry e = new Entry();
+                    e.pkg = pkg;
                     e.label = String.valueOf(ri.loadLabel(pm));
                     e.icon = ri.loadIcon(pm);
                     e.intent = new Intent(Intent.ACTION_MAIN)
@@ -283,17 +312,56 @@ public class MainActivity extends Activity {
             }
             Collections.sort(list, (a, b) -> a.label.compareToIgnoreCase(b.label));
             ui.post(() -> {
-                entries.clear();
-                entries.add(settingsEntry());
-                entries.addAll(list);
-                adapter.notifyDataSetChanged();
+                all.clear();
+                all.addAll(list);
+                rebuild();
                 if (selected >= entries.size()) selected = 0;
                 grid.requestFocus();
             });
         }).start();
     }
 
+    List<String> loadOrder() {
+        List<String> out = new ArrayList<>();
+        String s = prefs.getString("order", "");
+        if (!s.isEmpty()) {
+            for (String p : s.split("\n")) {
+                if (!p.isEmpty()) out.add(p);
+            }
+        }
+        return out;
+    }
+
+    void saveOrder() {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 1; i < entries.size(); i++) {
+            if (entries.get(i).pkg != null) sb.append(entries.get(i).pkg).append('\n');
+        }
+        prefs.edit().putString("order", sb.toString()).apply();
+    }
+
+    void rebuild() {
+        List<Entry> vis = new ArrayList<>();
+        for (Entry e : all) {
+            if (!hidden.contains(e.pkg)) vis.add(e);
+        }
+        final Map<String, Integer> rank = new HashMap<>();
+        List<String> order = loadOrder();
+        for (int i = 0; i < order.size(); i++) rank.put(order.get(i), i);
+        Collections.sort(vis, (a, b) -> {
+            int ra = rank.containsKey(a.pkg) ? rank.get(a.pkg) : Integer.MAX_VALUE;
+            int rb = rank.containsKey(b.pkg) ? rank.get(b.pkg) : Integer.MAX_VALUE;
+            if (ra != rb) return Integer.compare(ra, rb);
+            return a.label.compareToIgnoreCase(b.label);
+        });
+        entries.clear();
+        entries.add(settingsEntry());
+        entries.addAll(vis);
+        adapter.notifyDataSetChanged();
+    }
+
     void activate(Entry e) {
+        if (organizing) return;
         if (e.settings) {
             showSettings();
             return;
@@ -312,6 +380,9 @@ public class MainActivity extends Activity {
                 "Fundo com foto: escolher arquivo...",
                 "Fundo com foto: usar a enviada pelo Termux",
                 "Apps por linha: " + cols + "...",
+                "Escolher quais apps aparecem...",
+                "Organizar apps (mover)...",
+                "Restaurar ordem alfabética",
                 "Ajuda: enviar foto pelo Termux"
         };
         new AlertDialog.Builder(this).setTitle("Ajustes").setItems(items, (d, which) -> {
@@ -332,10 +403,114 @@ public class MainActivity extends Activity {
                 case 4:
                     showCols();
                     break;
+                case 5:
+                    showVisible();
+                    break;
+                case 6:
+                    startOrganize();
+                    break;
+                case 7:
+                    prefs.edit().remove("order").apply();
+                    rebuild();
+                    break;
                 default:
                     showHelp("Como enviar uma foto:");
             }
         }).show();
+    }
+
+    void showVisible() {
+        final int n = all.size();
+        final String[] names = new String[n];
+        final boolean[] checked = new boolean[n];
+        for (int i = 0; i < n; i++) {
+            names[i] = all.get(i).label;
+            checked[i] = !hidden.contains(all.get(i).pkg);
+        }
+        new AlertDialog.Builder(this)
+                .setTitle("Apps que aparecem")
+                .setMultiChoiceItems(names, checked, (d, which, isChecked) -> checked[which] = isChecked)
+                .setPositiveButton("Salvar", (d, w) -> {
+                    Set<String> h = new HashSet<>();
+                    for (int i = 0; i < n; i++) {
+                        if (!checked[i]) h.add(all.get(i).pkg);
+                    }
+                    hidden = h;
+                    prefs.edit().putStringSet("hidden", new HashSet<>(h)).apply();
+                    selected = 0;
+                    rebuild();
+                })
+                .setNegativeButton("Cancelar", null)
+                .show();
+    }
+
+    void startOrganize() {
+        organizing = true;
+        picked = false;
+        hint.setVisibility(View.VISIBLE);
+        if (entries.size() > 1) {
+            selected = 1;
+            grid.setSelection(1);
+        }
+        applyFocus();
+    }
+
+    void exitOrganize() {
+        organizing = false;
+        picked = false;
+        hint.setVisibility(View.GONE);
+        saveOrder();
+        applyFocus();
+    }
+
+    void moveSelected(int delta) {
+        int from = selected;
+        int to = selected + delta;
+        if (from < 1 || to < 1 || to >= entries.size()) return;
+        Entry e = entries.remove(from);
+        entries.add(to, e);
+        selected = to;
+        saveOrder();
+        adapter.notifyDataSetChanged();
+        grid.setSelection(to);
+        applyFocus();
+    }
+
+    @Override
+    public boolean dispatchKeyEvent(KeyEvent ev) {
+        if (organizing && ev.getAction() == KeyEvent.ACTION_DOWN) {
+            int code = ev.getKeyCode();
+            if (code == KeyEvent.KEYCODE_BACK) {
+                exitOrganize();
+                return true;
+            }
+            if (code == KeyEvent.KEYCODE_DPAD_CENTER || code == KeyEvent.KEYCODE_ENTER) {
+                if (ev.getRepeatCount() == 0 && selected >= 1) {
+                    picked = !picked;
+                    applyFocus();
+                }
+                return true;
+            }
+            if (picked) {
+                if (code == KeyEvent.KEYCODE_DPAD_LEFT) {
+                    moveSelected(-1);
+                    return true;
+                }
+                if (code == KeyEvent.KEYCODE_DPAD_RIGHT) {
+                    moveSelected(1);
+                    return true;
+                }
+                if (code == KeyEvent.KEYCODE_DPAD_UP) {
+                    moveSelected(-cols);
+                    return true;
+                }
+                if (code == KeyEvent.KEYCODE_DPAD_DOWN) {
+                    moveSelected(cols);
+                    return true;
+                }
+            }
+        }
+        return super.dispatchKeyEvent(ev);
     }
 
     void showColors() {
