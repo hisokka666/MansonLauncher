@@ -3,11 +3,11 @@ plugins {
 }
 
 android {
-    namespace 'io.aero.launcher'
+    namespace 'io.manson.launcher'
     compileSdk 34
 
     defaultConfig {
-        applicationId 'io.aero.launcher'
+        applicationId 'io.manson.launcher'
         minSdk 26
         targetSdk 34
         versionCode 1
