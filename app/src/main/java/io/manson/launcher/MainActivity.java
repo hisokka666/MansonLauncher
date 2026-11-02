@@ -13,21 +13,34 @@ import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.Outline;
+import android.graphics.Paint;
+import android.graphics.Path;
+import android.graphics.Rect;
+import android.graphics.RectF;
 import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
+import android.media.tv.TvContract;
+import android.media.tv.TvInputInfo;
+import android.media.tv.TvInputManager;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
-import android.text.TextUtils;
-import android.util.DisplayMetrics;
+import android.provider.Settings;
+import android.text.SpannableString;
+import android.text.Spanned;
+import android.text.style.ForegroundColorSpan;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewOutlineProvider;
+import android.widget.AbsListView;
 import android.widget.AdapterView;
 import android.widget.BaseAdapter;
 import android.widget.FrameLayout;
@@ -55,24 +68,27 @@ public class MainActivity extends Activity {
     static final int REQ_PICK = 11;
     static final int MATCH = ViewGroup.LayoutParams.MATCH_PARENT;
     static final int WRAP = ViewGroup.LayoutParams.WRAP_CONTENT;
+    static final int ACCENT = 0xFF2EB8FF;
     static final int[] SOLID = {0xFF0B2A4A, 0xFF111827, 0xFF374151, 0xFF0F3D3E, 0xFF3B1F4A, 0xFF000000};
     static final String[] SOLID_NAMES = {"Azul marinho", "Grafite", "Cinza", "Verde petróleo", "Roxo", "Preto"};
-    static final int[] COLS = {6, 8, 10, 12};
+    static final int[] COLS = {4, 5, 6, 8};
+    static final String[] LIVE_TV_PKGS = {
+            "com.mediatek.tv.oneworld.tvcenter", "com.tcl.tv", "com.google.android.tv", "com.android.tv"};
     static final String HELP_PATH = "/sdcard/Android/data/io.manson.launcher/files/wallpaper.jpg";
 
     static class Entry {
         String label;
         String pkg;
         Drawable icon;
+        Drawable banner;
         Intent intent;
-        boolean settings;
     }
 
     SharedPreferences prefs;
-    float dp;
-    float labelPx;
+    float k;
     int cols;
-    int iconSize;
+    int cardW;
+    int cardH;
     int selected = 0;
     boolean organizing = false;
     boolean picked = false;
@@ -81,6 +97,7 @@ public class MainActivity extends Activity {
     View scrim;
     GridView grid;
     TextView clock;
+    TextView date;
     TextView hint;
     BaseAdapter adapter;
     final List<Entry> all = new ArrayList<>();
@@ -91,7 +108,9 @@ public class MainActivity extends Activity {
     final Runnable tick = new Runnable() {
         @Override
         public void run() {
-            clock.setText(new SimpleDateFormat("HH:mm", Locale.getDefault()).format(new Date()));
+            Date now = new Date();
+            clock.setText(new SimpleDateFormat("HH:mm", Locale.getDefault()).format(now));
+            date.setText(new SimpleDateFormat("EEEE, d 'de' MMMM", new Locale("pt", "BR")).format(now));
             ui.postDelayed(this, 15000);
         }
     };
@@ -103,12 +122,27 @@ public class MainActivity extends Activity {
         }
     };
 
+    int px(float v) {
+        return Math.round(v * k);
+    }
+
+    TextView text(String s, float sizePx, int color, Typeface tf) {
+        TextView t = new TextView(this);
+        t.setText(s);
+        t.setTextColor(color);
+        t.setTextSize(TypedValue.COMPLEX_UNIT_PX, sizePx);
+        t.setTypeface(tf);
+        t.setIncludeFontPadding(false);
+        return t;
+    }
+
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
         prefs = getSharedPreferences("manson", MODE_PRIVATE);
-        dp = getResources().getDisplayMetrics().density;
-        cols = prefs.getInt("cols", 10);
+        k = getResources().getDisplayMetrics().widthPixels / 1920f;
+        cols = prefs.getInt("cols", 5);
+        if (cols < 3 || cols > 8) cols = 5;
         hidden = new HashSet<>(prefs.getStringSet("hidden", new HashSet<String>()));
 
         root = new FrameLayout(this);
@@ -119,7 +153,7 @@ public class MainActivity extends Activity {
         root.addView(photoView, new FrameLayout.LayoutParams(MATCH, MATCH));
 
         scrim = new View(this);
-        scrim.setBackgroundColor(0x40000000);
+        scrim.setBackgroundColor(0x55000000);
         root.addView(scrim, new FrameLayout.LayoutParams(MATCH, MATCH));
 
         LinearLayout column = new LinearLayout(this);
@@ -127,22 +161,8 @@ public class MainActivity extends Activity {
         column.setClipChildren(false);
         root.addView(column, new FrameLayout.LayoutParams(MATCH, MATCH));
 
-        clock = new TextView(this);
-        clock.setTextColor(Color.WHITE);
-        clock.setTextSize(TypedValue.COMPLEX_UNIT_PX, 34 * dp);
-        clock.setTypeface(Typeface.create("sans-serif-light", Typeface.NORMAL));
-        clock.setShadowLayer(8, 0, 2, 0x88000000);
-        clock.setPadding((int) (56 * dp), (int) (28 * dp), 0, 0);
-        column.addView(clock, new LinearLayout.LayoutParams(WRAP, WRAP));
-
-        hint = new TextView(this);
-        hint.setTextColor(0xFFFFE08A);
-        hint.setTextSize(TypedValue.COMPLEX_UNIT_PX, 16 * dp);
-        hint.setShadowLayer(6, 0, 2, 0x88000000);
-        hint.setPadding((int) (56 * dp), (int) (4 * dp), 0, 0);
-        hint.setText("MODO ORGANIZAR: OK pega ou solta o app · setas movem · VOLTAR termina");
-        hint.setVisibility(View.GONE);
-        column.addView(hint, new LinearLayout.LayoutParams(WRAP, WRAP));
+        column.addView(buildHeader(), new LinearLayout.LayoutParams(MATCH, px(140)));
+        column.addView(buildClockBlock(), new LinearLayout.LayoutParams(WRAP, WRAP));
 
         grid = new GridView(this);
         grid.setSelector(new ColorDrawable(Color.TRANSPARENT));
@@ -161,12 +181,22 @@ public class MainActivity extends Activity {
             public void onNothingSelected(AdapterView<?> parent) {
             }
         });
+        grid.setOnFocusChangeListener((v, has) -> applyFocus());
         grid.setOnItemClickListener((parent, view, position, id) -> activate(entries.get(position)));
         column.addView(grid, new LinearLayout.LayoutParams(MATCH, 0, 1f));
 
+        SettingsCard sc = new SettingsCard(this);
+        sc.setOnClickListener(v -> {
+            if (!organizing) showSettings();
+        });
+        LinearLayout.LayoutParams slp = new LinearLayout.LayoutParams(px(560), px(116));
+        slp.leftMargin = px(84);
+        slp.topMargin = px(6);
+        slp.bottomMargin = px(40);
+        column.addView(sc, slp);
+
         setContentView(root);
 
-        entries.add(settingsEntry());
         configureGrid();
         adapter = new Adapter();
         grid.setAdapter(adapter);
@@ -174,69 +204,309 @@ public class MainActivity extends Activity {
         loadApps();
     }
 
-    void configureGrid() {
-        DisplayMetrics m = getResources().getDisplayMetrics();
-        int pad = (int) (48 * dp);
-        int gap = (int) (14 * dp);
-        int cellW = (m.widthPixels - 2 * pad - (cols - 1) * gap) / cols;
-        iconSize = (int) (cellW * 0.56f);
-        labelPx = Math.max(11 * dp, cellW * 0.12f);
-        grid.setNumColumns(cols);
-        grid.setHorizontalSpacing(gap);
-        grid.setVerticalSpacing((int) (20 * dp));
-        grid.setPadding(pad, (int) (24 * dp), pad, (int) (24 * dp));
+    View buildHeader() {
+        FrameLayout header = new FrameLayout(this);
+        header.setClipChildren(false);
+        header.setPadding(px(84), px(8), px(84), 0);
+
+        LinearLayout left = new LinearLayout(this);
+        left.setOrientation(LinearLayout.HORIZONTAL);
+        left.setGravity(Gravity.CENTER_VERTICAL);
+
+        ImageView mark = new ImageView(this);
+        mark.setImageResource(R.drawable.ic_manson);
+        left.addView(mark, new LinearLayout.LayoutParams(px(76), px(76)));
+
+        View divider = new View(this);
+        divider.setBackgroundColor(0x55FFFFFF);
+        LinearLayout.LayoutParams dlp = new LinearLayout.LayoutParams(Math.max(1, px(2)), px(56));
+        dlp.leftMargin = px(24);
+        dlp.rightMargin = px(24);
+        left.addView(divider, dlp);
+
+        LinearLayout names = new LinearLayout(this);
+        names.setOrientation(LinearLayout.VERTICAL);
+        TextView title = text("", px(28), Color.WHITE, Typeface.DEFAULT_BOLD);
+        SpannableString ss = new SpannableString("MANSON LAUNCHER");
+        ss.setSpan(new ForegroundColorSpan(0xFF1E8CFF), 7, 15, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        title.setText(ss);
+        title.setLetterSpacing(0.16f);
+        TextView sub = text("SUA TV, DO SEU JEITO", px(16), 0xFF9AA7C0, Typeface.DEFAULT);
+        sub.setLetterSpacing(0.2f);
+        LinearLayout.LayoutParams sublp = new LinearLayout.LayoutParams(WRAP, WRAP);
+        sublp.topMargin = px(6);
+        names.addView(title, new LinearLayout.LayoutParams(WRAP, WRAP));
+        names.addView(sub, sublp);
+        left.addView(names, new LinearLayout.LayoutParams(WRAP, WRAP));
+        header.addView(left, new FrameLayout.LayoutParams(WRAP, WRAP, Gravity.START | Gravity.CENTER_VERTICAL));
+
+        LinearLayout right = new LinearLayout(this);
+        right.setOrientation(LinearLayout.HORIZONTAL);
+        right.setGravity(Gravity.CENTER_VERTICAL);
+        right.setClipChildren(false);
+
+        RoundBtn live = new RoundBtn(this, 0);
+        live.setOnClickListener(v -> openLiveTv());
+        RoundBtn hdmi = new RoundBtn(this, 1);
+        hdmi.setOnClickListener(v -> openHdmi());
+        RoundBtn sys = new RoundBtn(this, 2);
+        sys.setOnClickListener(v -> openSystemSettings());
+        RoundBtn[] btns = {live, hdmi, sys};
+        for (RoundBtn b : btns) {
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(px(80), px(80));
+            lp.leftMargin = px(20);
+            right.addView(b, lp);
+        }
+        header.addView(right, new FrameLayout.LayoutParams(WRAP, WRAP, Gravity.END | Gravity.CENTER_VERTICAL));
+        return header;
     }
 
-    class Cell extends LinearLayout {
-        final ImageView icon;
+    View buildClockBlock() {
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(px(84), px(4), 0, 0);
+
+        clock = text("--:--", px(150), Color.WHITE, Typeface.create("sans-serif-light", Typeface.NORMAL));
+        clock.setShadowLayer(12, 0, 2, 0x66000000);
+        box.addView(clock, new LinearLayout.LayoutParams(WRAP, WRAP));
+
+        date = text("", px(34), 0xFFE6ECF7, Typeface.DEFAULT);
+        LinearLayout.LayoutParams dlp = new LinearLayout.LayoutParams(WRAP, WRAP);
+        dlp.topMargin = px(8);
+        box.addView(date, dlp);
+
+        hint = text("MODO ORGANIZAR: OK pega ou solta o app · setas movem · VOLTAR termina",
+                px(22), 0xFFFFE08A, Typeface.DEFAULT);
+        hint.setVisibility(View.GONE);
+        LinearLayout.LayoutParams hlp = new LinearLayout.LayoutParams(WRAP, WRAP);
+        hlp.topMargin = px(10);
+        box.addView(hint, hlp);
+        return box;
+    }
+
+    void configureGrid() {
+        int pad = px(84);
+        int gap = px(32);
+        int w = getResources().getDisplayMetrics().widthPixels;
+        cardW = (w - 2 * pad - (cols - 1) * gap) / cols;
+        cardH = cardW * 9 / 16;
+        grid.setNumColumns(cols);
+        grid.setHorizontalSpacing(gap);
+        grid.setVerticalSpacing(px(36));
+        grid.setPadding(pad, px(24), pad, px(24));
+    }
+
+    class RoundBtn extends View {
+        final int kind;
+        boolean f = false;
+        final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+
+        RoundBtn(Context c, int kind) {
+            super(c);
+            this.kind = kind;
+            setFocusable(true);
+            setClickable(true);
+        }
+
+        @Override
+        protected void onFocusChanged(boolean gain, int direction, Rect prev) {
+            super.onFocusChanged(gain, direction, prev);
+            f = gain;
+            setScaleX(gain ? 1.12f : 1f);
+            setScaleY(gain ? 1.12f : 1f);
+            invalidate();
+        }
+
+        @Override
+        protected void onDraw(Canvas cv) {
+            float w = getWidth();
+            float h = getHeight();
+            float cx = w / 2f;
+            float cy = h / 2f;
+            float r = Math.min(w, h) / 2f - px(4);
+
+            p.setStyle(Paint.Style.FILL);
+            p.setColor(f ? 0x552EB8FF : 0x22FFFFFF);
+            cv.drawCircle(cx, cy, r, p);
+            p.setStyle(Paint.Style.STROKE);
+            p.setStrokeWidth(Math.max(2, px(f ? 4 : 2)));
+            p.setColor(f ? ACCENT : 0xB3FFFFFF);
+            cv.drawCircle(cx, cy, r, p);
+
+            float s = r;
+            p.setColor(Color.WHITE);
+            p.setStrokeWidth(Math.max(2, px(4)));
+            p.setStrokeCap(Paint.Cap.ROUND);
+            p.setStrokeJoin(Paint.Join.ROUND);
+
+            if (kind == 0) {
+                RectF rf = new RectF(cx - s * 0.55f, cy - s * 0.38f, cx + s * 0.55f, cy + s * 0.30f);
+                p.setStyle(Paint.Style.STROKE);
+                cv.drawRoundRect(rf, px(6), px(6), p);
+                Path tri = new Path();
+                tri.moveTo(cx - s * 0.10f, cy - s * 0.18f);
+                tri.lineTo(cx + s * 0.20f, cy - s * 0.04f);
+                tri.lineTo(cx - s * 0.10f, cy + s * 0.10f);
+                tri.close();
+                p.setStyle(Paint.Style.FILL);
+                cv.drawPath(tri, p);
+                p.setStyle(Paint.Style.STROKE);
+                cv.drawLine(cx - s * 0.25f, cy + s * 0.44f, cx + s * 0.25f, cy + s * 0.44f, p);
+            } else if (kind == 1) {
+                Path hp = new Path();
+                hp.moveTo(cx - s * 0.45f, cy - s * 0.30f);
+                hp.lineTo(cx + s * 0.45f, cy - s * 0.30f);
+                hp.lineTo(cx + s * 0.45f, cy + s * 0.05f);
+                hp.lineTo(cx + s * 0.22f, cy + s * 0.32f);
+                hp.lineTo(cx - s * 0.22f, cy + s * 0.32f);
+                hp.lineTo(cx - s * 0.45f, cy + s * 0.05f);
+                hp.close();
+                p.setStyle(Paint.Style.STROKE);
+                cv.drawPath(hp, p);
+                cv.drawLine(cx - s * 0.18f, cy - s * 0.12f, cx - s * 0.18f, cy + s * 0.10f, p);
+                cv.drawLine(cx, cy - s * 0.12f, cx, cy + s * 0.10f, p);
+                cv.drawLine(cx + s * 0.18f, cy - s * 0.12f, cx + s * 0.18f, cy + s * 0.10f, p);
+            } else {
+                final double[] offs = {-0.28, -0.20, 0.20, 0.28};
+                final float r2 = s * 0.52f;
+                final float r1 = s * 0.40f;
+                final float[] rr = {r1, r2, r2, r1};
+                Path g = new Path();
+                g.setFillType(Path.FillType.EVEN_ODD);
+                for (int t = 0; t < 8; t++) {
+                    double a = t * Math.PI / 4;
+                    for (int j = 0; j < 4; j++) {
+                        float x = cx + (float) (rr[j] * Math.cos(a + offs[j]));
+                        float y = cy + (float) (rr[j] * Math.sin(a + offs[j]));
+                        if (t == 0 && j == 0) g.moveTo(x, y);
+                        else g.lineTo(x, y);
+                    }
+                }
+                g.close();
+                g.addCircle(cx, cy, s * 0.18f, Path.Direction.CW);
+                p.setStyle(Paint.Style.FILL);
+                cv.drawPath(g, p);
+            }
+        }
+    }
+
+    class SettingsCard extends LinearLayout {
+        final GradientDrawable bg;
+
+        SettingsCard(Context c) {
+            super(c);
+            setOrientation(HORIZONTAL);
+            setGravity(Gravity.CENTER_VERTICAL);
+            setFocusable(true);
+            setClickable(true);
+            setPadding(px(30), px(14), px(30), px(14));
+
+            ImageView ic = new ImageView(c);
+            ic.setImageResource(R.drawable.ic_manson);
+            addView(ic, new LinearLayout.LayoutParams(px(84), px(84)));
+
+            LinearLayout t = new LinearLayout(c);
+            t.setOrientation(VERTICAL);
+            t.setPadding(px(22), 0, 0, 0);
+            TextView a = text("Configurações do", px(24), 0xFFDDE6F5, Typeface.DEFAULT);
+            TextView b = text("MansonLauncher", px(30), ACCENT, Typeface.DEFAULT_BOLD);
+            t.addView(a, new LinearLayout.LayoutParams(WRAP, WRAP));
+            t.addView(b, new LinearLayout.LayoutParams(WRAP, WRAP));
+            addView(t, new LinearLayout.LayoutParams(WRAP, WRAP));
+
+            bg = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                    new int[]{0xFF101B33, 0xFF0A1226});
+            bg.setCornerRadius(px(22));
+            setBackground(bg);
+            look(false);
+        }
+
+        void look(boolean f) {
+            bg.setStroke(Math.max(1, px(f ? 4 : 1)), f ? ACCENT : 0x33FFFFFF);
+            setScaleX(f ? 1.04f : 1f);
+            setScaleY(f ? 1.04f : 1f);
+            setTranslationZ(f ? px(12) : 0);
+        }
+
+        @Override
+        protected void onFocusChanged(boolean gain, int direction, Rect prev) {
+            super.onFocusChanged(gain, direction, prev);
+            look(gain);
+        }
+    }
+
+    class Cell extends FrameLayout {
+        final ImageView img;
         final TextView label;
         final GradientDrawable bg;
+        final Paint ring = new Paint(Paint.ANTI_ALIAS_FLAG);
+        final RectF rr = new RectF();
+        boolean focus = false;
+        boolean pick = false;
 
         Cell(Context c) {
             super(c);
-            setOrientation(VERTICAL);
-            setGravity(Gravity.CENTER_HORIZONTAL);
-            int p = (int) (10 * dp);
-            setPadding(p, p, p, p);
-
-            icon = new ImageView(c);
-            icon.setScaleType(ImageView.ScaleType.FIT_CENTER);
-            addView(icon, new LinearLayout.LayoutParams(iconSize, iconSize));
-
-            label = new TextView(c);
-            label.setTextColor(Color.WHITE);
-            label.setTextSize(TypedValue.COMPLEX_UNIT_PX, labelPx);
-            label.setSingleLine(true);
-            label.setEllipsize(TextUtils.TruncateAt.END);
-            label.setGravity(Gravity.CENTER);
-            label.setShadowLayer(4, 0, 2, 0xAA000000);
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(MATCH, WRAP);
-            lp.topMargin = (int) (8 * dp);
-            addView(label, lp);
-
+            setLayoutParams(new AbsListView.LayoutParams(cardW, cardH));
             bg = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                    new int[]{0x4DFFFFFF, 0x1AFFFFFF});
-            bg.setCornerRadius(18 * dp);
+                    new int[]{0xFF15233F, 0xFF0A1226});
+            bg.setCornerRadius(px(20));
             setBackground(bg);
+            setOutlineProvider(new ViewOutlineProvider() {
+                @Override
+                public void getOutline(View v, Outline o) {
+                    o.setRoundRect(0, 0, v.getWidth(), v.getHeight(), px(20));
+                }
+            });
+            setClipToOutline(true);
+
+            img = new ImageView(c);
+            addView(img, new FrameLayout.LayoutParams(MATCH, MATCH));
+
+            label = text("", px(20), Color.WHITE, Typeface.DEFAULT);
+            label.setSingleLine(true);
+            label.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            label.setGravity(Gravity.CENTER);
+            label.setPadding(px(10), 0, px(10), px(12));
+            addView(label, new FrameLayout.LayoutParams(MATCH, WRAP, Gravity.BOTTOM));
+
+            ring.setStyle(Paint.Style.STROKE);
             setLook(false, false);
         }
 
-        void setLook(boolean f, boolean p) {
-            if (p) {
-                bg.setColors(new int[]{0xCCFFFFFF, 0x66FFFFFF});
-                bg.setStroke((int) (4 * dp), 0xFFFFC857);
-            } else if (f) {
-                bg.setColors(new int[]{0x99FFFFFF, 0x40FFFFFF});
-                bg.setStroke((int) (3 * dp), 0xFF8FEBFF);
+        void bind(Entry e) {
+            if (e.banner != null) {
+                img.setScaleType(ImageView.ScaleType.CENTER_CROP);
+                img.setPadding(0, 0, 0, 0);
+                img.setImageDrawable(e.banner);
+                label.setVisibility(View.GONE);
             } else {
-                bg.setColors(new int[]{0x4DFFFFFF, 0x1AFFFFFF});
-                bg.setStroke((int) (1 * dp), 0x44FFFFFF);
+                img.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                int p = px(18);
+                img.setPadding(p, p, p, px(50));
+                img.setImageDrawable(e.icon);
+                label.setText(e.label);
+                label.setVisibility(View.VISIBLE);
             }
-            float s = p ? 1.2f : (f ? 1.12f : 1f);
+        }
+
+        void setLook(boolean f, boolean p) {
+            focus = f;
+            pick = p;
+            float s = p ? 1.12f : (f ? 1.07f : 1f);
             setScaleX(s);
             setScaleY(s);
-            setTranslationZ((f || p) ? 12 * dp : 0);
-            label.setTypeface(f ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT);
+            setTranslationZ((f || p) ? px(14) : 0);
+            invalidate();
+        }
+
+        @Override
+        protected void dispatchDraw(Canvas canvas) {
+            super.dispatchDraw(canvas);
+            float sw = Math.max(1f, px((focus || pick) ? 4 : 1));
+            ring.setStrokeWidth(sw);
+            ring.setColor(pick ? 0xFFFFC857 : (focus ? ACCENT : 0x33FFFFFF));
+            rr.set(sw / 2f, sw / 2f, getWidth() - sw / 2f, getHeight() - sw / 2f);
+            canvas.drawRoundRect(rr, px(20), px(20), ring);
         }
     }
 
@@ -259,31 +529,22 @@ public class MainActivity extends Activity {
         @Override
         public View getView(int i, View convert, ViewGroup parent) {
             Cell c = (convert instanceof Cell) ? (Cell) convert : new Cell(MainActivity.this);
-            Entry e = entries.get(i);
-            c.icon.setImageDrawable(e.icon);
-            c.label.setText(e.label);
-            c.setLook(i == selected, organizing && picked && i == selected);
+            c.bind(entries.get(i));
+            c.setLook(grid.hasFocus() && i == selected, organizing && picked && i == selected);
             return c;
         }
     }
 
     void applyFocus() {
         int first = grid.getFirstVisiblePosition();
+        boolean hasFocus = grid.hasFocus();
         for (int i = 0; i < grid.getChildCount(); i++) {
             View v = grid.getChildAt(i);
             if (v instanceof Cell) {
                 int pos = first + i;
-                ((Cell) v).setLook(pos == selected, organizing && picked && pos == selected);
+                ((Cell) v).setLook(hasFocus && pos == selected, organizing && picked && pos == selected);
             }
         }
-    }
-
-    Entry settingsEntry() {
-        Entry e = new Entry();
-        e.label = "Ajustes";
-        e.icon = getResources().getDrawable(android.R.drawable.ic_menu_manage, getTheme());
-        e.settings = true;
-        return e;
     }
 
     void loadApps() {
@@ -302,6 +563,7 @@ public class MainActivity extends Activity {
                     e.pkg = pkg;
                     e.label = String.valueOf(ri.loadLabel(pm));
                     e.icon = ri.loadIcon(pm);
+                    e.banner = ri.activityInfo.loadBanner(pm);
                     e.intent = new Intent(Intent.ACTION_MAIN)
                             .addCategory(cat)
                             .setComponent(new ComponentName(pkg, ri.activityInfo.name))
@@ -334,8 +596,8 @@ public class MainActivity extends Activity {
 
     void saveOrder() {
         StringBuilder sb = new StringBuilder();
-        for (int i = 1; i < entries.size(); i++) {
-            if (entries.get(i).pkg != null) sb.append(entries.get(i).pkg).append('\n');
+        for (Entry e : entries) {
+            if (e.pkg != null) sb.append(e.pkg).append('\n');
         }
         prefs.edit().putString("order", sb.toString()).apply();
     }
@@ -355,17 +617,12 @@ public class MainActivity extends Activity {
             return a.label.compareToIgnoreCase(b.label);
         });
         entries.clear();
-        entries.add(settingsEntry());
         entries.addAll(vis);
         adapter.notifyDataSetChanged();
     }
 
     void activate(Entry e) {
         if (organizing) return;
-        if (e.settings) {
-            showSettings();
-            return;
-        }
         try {
             startActivity(e.intent);
         } catch (Exception ex) {
@@ -373,9 +630,70 @@ public class MainActivity extends Activity {
         }
     }
 
+    void openLiveTv() {
+        PackageManager pm = getPackageManager();
+        for (String p : LIVE_TV_PKGS) {
+            Intent i = pm.getLeanbackLaunchIntentForPackage(p);
+            if (i == null) i = pm.getLaunchIntentForPackage(p);
+            if (i != null) {
+                try {
+                    startActivity(i);
+                    return;
+                } catch (Exception ignored) {
+                }
+            }
+        }
+        Toast.makeText(this, "Não encontrei o app de TV aberta nesta TV.", Toast.LENGTH_LONG).show();
+    }
+
+    void openHdmi() {
+        TvInputManager tm = (TvInputManager) getSystemService(Context.TV_INPUT_SERVICE);
+        final List<TvInputInfo> hdmi = new ArrayList<>();
+        if (tm != null) {
+            try {
+                for (TvInputInfo info : tm.getTvInputList()) {
+                    if (info.getType() == TvInputInfo.TYPE_HDMI) hdmi.add(info);
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        if (hdmi.isEmpty()) {
+            Toast.makeText(this, "Não encontrei entradas HDMI nesta TV.", Toast.LENGTH_LONG).show();
+            return;
+        }
+        if (hdmi.size() == 1) {
+            launchInput(hdmi.get(0));
+            return;
+        }
+        String[] names = new String[hdmi.size()];
+        for (int i = 0; i < names.length; i++) {
+            CharSequence l = hdmi.get(i).loadLabel(this);
+            names[i] = (l == null || l.length() == 0) ? ("HDMI " + (i + 1)) : String.valueOf(l);
+        }
+        new AlertDialog.Builder(this).setTitle("Entradas HDMI")
+                .setItems(names, (d, which) -> launchInput(hdmi.get(which))).show();
+    }
+
+    void launchInput(TvInputInfo info) {
+        try {
+            startActivity(new Intent(Intent.ACTION_VIEW,
+                    TvContract.buildChannelUriForPassthroughInput(info.getId())));
+        } catch (Exception e) {
+            Toast.makeText(this, "Não foi possível abrir essa entrada.", Toast.LENGTH_LONG).show();
+        }
+    }
+
+    void openSystemSettings() {
+        try {
+            startActivity(new Intent(Settings.ACTION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        } catch (Exception e) {
+            Toast.makeText(this, "Não foi possível abrir as configurações da TV.", Toast.LENGTH_LONG).show();
+        }
+    }
+
     void showSettings() {
         String[] items = {
-                "Fundo padrão (degradê azul)",
+                "Fundo padrão (azul-marinho escuro)",
                 "Fundo de cor lisa...",
                 "Fundo com foto: escolher arquivo...",
                 "Fundo com foto: usar a enviada pelo Termux",
@@ -445,13 +763,13 @@ public class MainActivity extends Activity {
     }
 
     void startOrganize() {
+        if (entries.isEmpty()) return;
         organizing = true;
         picked = false;
         hint.setVisibility(View.VISIBLE);
-        if (entries.size() > 1) {
-            selected = 1;
-            grid.setSelection(1);
-        }
+        if (selected >= entries.size()) selected = 0;
+        grid.requestFocus();
+        grid.setSelection(selected);
         applyFocus();
     }
 
@@ -466,7 +784,7 @@ public class MainActivity extends Activity {
     void moveSelected(int delta) {
         int from = selected;
         int to = selected + delta;
-        if (from < 1 || to < 1 || to >= entries.size()) return;
+        if (from < 0 || to < 0 || to >= entries.size()) return;
         Entry e = entries.remove(from);
         entries.add(to, e);
         selected = to;
@@ -485,7 +803,7 @@ public class MainActivity extends Activity {
                 return true;
             }
             if (code == KeyEvent.KEYCODE_DPAD_CENTER || code == KeyEvent.KEYCODE_ENTER) {
-                if (ev.getRepeatCount() == 0 && selected >= 1) {
+                if (ev.getRepeatCount() == 0 && selected >= 0) {
                     picked = !picked;
                     applyFocus();
                 }
@@ -617,7 +935,7 @@ public class MainActivity extends Activity {
             }
         }
         root.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{0xFF1E78B4, 0xFF0B3A6B, 0xFF051A3A}));
+                new int[]{0xFF0F1B36, 0xFF08112A, 0xFF040813}));
     }
 
     @Override
@@ -655,6 +973,7 @@ public class MainActivity extends Activity {
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         grid.setSelection(0);
+        grid.requestFocus();
     }
 
     @Override
