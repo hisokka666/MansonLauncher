@@ -24,6 +24,7 @@ import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
+import android.media.AudioManager;
 import android.media.tv.TvContract;
 import android.media.tv.TvInputInfo;
 import android.media.tv.TvInputManager;
@@ -33,6 +34,7 @@ import android.os.Looper;
 import android.provider.Settings;
 import android.text.SpannableString;
 import android.text.Spanned;
+import android.text.TextUtils;
 import android.text.style.ForegroundColorSpan;
 import android.util.TypedValue;
 import android.view.Gravity;
@@ -43,6 +45,7 @@ import android.view.ViewOutlineProvider;
 import android.widget.AbsListView;
 import android.widget.AdapterView;
 import android.widget.BaseAdapter;
+import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.GridView;
 import android.widget.ImageView;
@@ -50,9 +53,16 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.net.URLEncoder;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -68,13 +78,37 @@ public class MainActivity extends Activity {
     static final int REQ_PICK = 11;
     static final int MATCH = ViewGroup.LayoutParams.MATCH_PARENT;
     static final int WRAP = ViewGroup.LayoutParams.WRAP_CONTENT;
-    static final int ACCENT = 0xFF2EB8FF;
     static final int[] SOLID = {0xFF0B2A4A, 0xFF111827, 0xFF374151, 0xFF0F3D3E, 0xFF3B1F4A, 0xFF000000};
     static final String[] SOLID_NAMES = {"Azul marinho", "Grafite", "Cinza", "Verde petróleo", "Roxo", "Preto"};
     static final int[] COLS = {4, 5, 6, 8};
     static final String[] LIVE_TV_PKGS = {
             "com.mediatek.tv.oneworld.tvcenter", "com.tcl.tv", "com.google.android.tv", "com.android.tv"};
     static final String HELP_PATH = "/sdcard/Android/data/io.manson.launcher/files/wallpaper.jpg";
+
+    static final String[] THEME_NAMES = {"Azul (padrão)", "Grafite", "Roxo", "Verde", "Vermelho"};
+    static final int[] THEME_ACCENT = {0xFF2EB8FF, 0xFFB8C4D6, 0xFFB26BFF, 0xFF3BE3A1, 0xFFFF4D5A};
+    static final int[][] THEME_BG = {
+            {0xFF0F1B36, 0xFF08112A, 0xFF040813},
+            {0xFF1B1F27, 0xFF111419, 0xFF08090C},
+            {0xFF1E1036, 0xFF120A26, 0xFF07040F},
+            {0xFF0B2A24, 0xFF071A17, 0xFF030C0A},
+            {0xFF2A0D12, 0xFF160709, 0xFF080304}};
+
+    static final String[][] CITIES = {
+            {"Aracaju", "-10.91", "-37.07"}, {"Belém", "-1.46", "-48.50"},
+            {"Belo Horizonte", "-19.92", "-43.94"}, {"Boa Vista", "2.82", "-60.67"},
+            {"Brasília", "-15.79", "-47.88"}, {"Campo Grande", "-20.46", "-54.62"},
+            {"Cuiabá", "-15.60", "-56.10"}, {"Curitiba", "-25.43", "-49.27"},
+            {"Florianópolis", "-27.60", "-48.55"}, {"Fortaleza", "-3.73", "-38.53"},
+            {"Goiânia", "-16.68", "-49.25"}, {"João Pessoa", "-7.12", "-34.86"},
+            {"Macapá", "0.03", "-51.07"}, {"Maceió", "-9.67", "-35.74"},
+            {"Manaus", "-3.12", "-60.02"}, {"Natal", "-5.79", "-35.21"},
+            {"Palmas", "-10.18", "-48.33"}, {"Porto Alegre", "-30.03", "-51.23"},
+            {"Porto Velho", "-8.76", "-63.90"}, {"Recife", "-8.05", "-34.88"},
+            {"Rio Branco", "-9.97", "-67.81"}, {"Rio de Janeiro", "-22.91", "-43.17"},
+            {"Salvador", "-12.97", "-38.51"}, {"São Luís", "-2.53", "-44.30"},
+            {"São Paulo", "-23.55", "-46.63"}, {"Teresina", "-5.09", "-42.80"},
+            {"Vitória", "-20.32", "-40.34"}};
 
     static class Entry {
         String label;
@@ -85,11 +119,14 @@ public class MainActivity extends Activity {
     }
 
     SharedPreferences prefs;
+    AudioManager audio;
     float k;
+    int accent = 0xFF2EB8FF;
     int cols;
     int cardW;
     int cardH;
     int selected = 0;
+    boolean firstSelection = true;
     boolean organizing = false;
     boolean picked = false;
     FrameLayout root;
@@ -99,6 +136,9 @@ public class MainActivity extends Activity {
     TextView clock;
     TextView date;
     TextView hint;
+    LinearLayout weatherRow;
+    WeatherIcon weatherIcon;
+    TextView weatherText;
     BaseAdapter adapter;
     final List<Entry> all = new ArrayList<>();
     final List<Entry> entries = new ArrayList<>();
@@ -136,10 +176,22 @@ public class MainActivity extends Activity {
         return t;
     }
 
+    int theme() {
+        int t = prefs.getInt("theme", 0);
+        return (t < 0 || t >= THEME_NAMES.length) ? 0 : t;
+    }
+
+    void navSound() {
+        if (audio == null || !prefs.getBoolean("sounds", true)) return;
+        audio.playSoundEffect(AudioManager.FX_FOCUS_NAVIGATION_RIGHT);
+    }
+
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
         prefs = getSharedPreferences("manson", MODE_PRIVATE);
+        audio = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+        accent = THEME_ACCENT[theme()];
         k = getResources().getDisplayMetrics().widthPixels / 1920f;
         cols = prefs.getInt("cols", 5);
         if (cols < 3 || cols > 8) cols = 5;
@@ -173,6 +225,8 @@ public class MainActivity extends Activity {
         grid.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                if (!firstSelection && position != selected) navSound();
+                firstSelection = false;
                 selected = position;
                 applyFocus();
             }
@@ -201,6 +255,7 @@ public class MainActivity extends Activity {
         adapter = new Adapter();
         grid.setAdapter(adapter);
         applyBackground();
+        updateWeatherUi();
         loadApps();
     }
 
@@ -275,6 +330,20 @@ public class MainActivity extends Activity {
         dlp.topMargin = px(8);
         box.addView(date, dlp);
 
+        weatherRow = new LinearLayout(this);
+        weatherRow.setOrientation(LinearLayout.HORIZONTAL);
+        weatherRow.setGravity(Gravity.CENTER_VERTICAL);
+        weatherIcon = new WeatherIcon(this);
+        weatherRow.addView(weatherIcon, new LinearLayout.LayoutParams(px(48), px(48)));
+        weatherText = text("", px(28), 0xFFDDE6F5, Typeface.DEFAULT);
+        LinearLayout.LayoutParams wtlp = new LinearLayout.LayoutParams(WRAP, WRAP);
+        wtlp.leftMargin = px(16);
+        weatherRow.addView(weatherText, wtlp);
+        weatherRow.setVisibility(View.GONE);
+        LinearLayout.LayoutParams wlp = new LinearLayout.LayoutParams(WRAP, WRAP);
+        wlp.topMargin = px(14);
+        box.addView(weatherRow, wlp);
+
         hint = text("MODO ORGANIZAR: OK pega ou solta o app · setas movem · VOLTAR termina",
                 px(22), 0xFFFFE08A, Typeface.DEFAULT);
         hint.setVisibility(View.GONE);
@@ -296,6 +365,90 @@ public class MainActivity extends Activity {
         grid.setPadding(pad, px(24), pad, px(24));
     }
 
+    class WeatherIcon extends View {
+        int kind = 2;
+        final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+
+        WeatherIcon(Context c) {
+            super(c);
+        }
+
+        void setKind(int kd) {
+            kind = kd;
+            invalidate();
+        }
+
+        void cloud(Canvas cv, float cx, float cy, float s) {
+            p.setStyle(Paint.Style.FILL);
+            p.setColor(0xFFDDE6F5);
+            cv.drawCircle(cx - s * 0.30f, cy + s * 0.05f, s * 0.30f, p);
+            cv.drawCircle(cx + s * 0.05f, cy - s * 0.15f, s * 0.40f, p);
+            cv.drawCircle(cx + s * 0.40f, cy + s * 0.08f, s * 0.28f, p);
+            cv.drawRect(cx - s * 0.30f, cy + s * 0.05f, cx + s * 0.40f, cy + s * 0.36f, p);
+        }
+
+        @Override
+        protected void onDraw(Canvas cv) {
+            float cx = getWidth() / 2f;
+            float cy = getHeight() / 2f;
+            float s = Math.min(getWidth(), getHeight()) / 2f;
+            if (kind == 0) {
+                p.setStyle(Paint.Style.FILL);
+                p.setColor(0xFFFFD54A);
+                cv.drawCircle(cx, cy, s * 0.38f, p);
+                p.setStyle(Paint.Style.STROKE);
+                p.setStrokeCap(Paint.Cap.ROUND);
+                p.setStrokeWidth(Math.max(2f, s * 0.10f));
+                for (int i = 0; i < 8; i++) {
+                    double a = i * Math.PI / 4;
+                    cv.drawLine(cx + (float) (Math.cos(a) * s * 0.58f), cy + (float) (Math.sin(a) * s * 0.58f),
+                            cx + (float) (Math.cos(a) * s * 0.84f), cy + (float) (Math.sin(a) * s * 0.84f), p);
+                }
+            } else if (kind == 1) {
+                Path m = new Path();
+                m.addCircle(cx, cy, s * 0.62f, Path.Direction.CW);
+                Path cut = new Path();
+                cut.addCircle(cx + s * 0.30f, cy - s * 0.18f, s * 0.56f, Path.Direction.CW);
+                m.op(cut, Path.Op.DIFFERENCE);
+                p.setStyle(Paint.Style.FILL);
+                p.setColor(0xFFE9EEF9);
+                cv.drawPath(m, p);
+            } else if (kind == 2) {
+                cloud(cv, cx, cy, s);
+            } else {
+                cloud(cv, cx, cy - s * 0.18f, s * 0.9f);
+                if (kind == 3) {
+                    p.setStyle(Paint.Style.STROKE);
+                    p.setStrokeCap(Paint.Cap.ROUND);
+                    p.setStrokeWidth(Math.max(2f, s * 0.09f));
+                    p.setColor(0xFF4FC3F7);
+                    for (int i = -1; i <= 1; i++) {
+                        float x = cx + i * s * 0.34f;
+                        cv.drawLine(x + s * 0.06f, cy + s * 0.36f, x - s * 0.06f, cy + s * 0.74f, p);
+                    }
+                } else if (kind == 4) {
+                    Path b = new Path();
+                    b.moveTo(cx + s * 0.05f, cy + s * 0.20f);
+                    b.lineTo(cx - s * 0.15f, cy + s * 0.52f);
+                    b.lineTo(cx, cy + s * 0.52f);
+                    b.lineTo(cx - s * 0.08f, cy + s * 0.82f);
+                    b.lineTo(cx + s * 0.20f, cy + s * 0.44f);
+                    b.lineTo(cx + s * 0.05f, cy + s * 0.44f);
+                    b.close();
+                    p.setStyle(Paint.Style.FILL);
+                    p.setColor(0xFFFFD54A);
+                    cv.drawPath(b, p);
+                } else {
+                    p.setStyle(Paint.Style.FILL);
+                    p.setColor(Color.WHITE);
+                    for (int i = -1; i <= 1; i++) {
+                        cv.drawCircle(cx + i * s * 0.34f, cy + s * 0.58f, s * 0.08f, p);
+                    }
+                }
+            }
+        }
+    }
+
     class RoundBtn extends View {
         final int kind;
         boolean f = false;
@@ -312,6 +465,7 @@ public class MainActivity extends Activity {
         protected void onFocusChanged(boolean gain, int direction, Rect prev) {
             super.onFocusChanged(gain, direction, prev);
             f = gain;
+            if (gain) navSound();
             setScaleX(gain ? 1.12f : 1f);
             setScaleY(gain ? 1.12f : 1f);
             invalidate();
@@ -326,11 +480,11 @@ public class MainActivity extends Activity {
             float r = Math.min(w, h) / 2f - px(4);
 
             p.setStyle(Paint.Style.FILL);
-            p.setColor(f ? 0x552EB8FF : 0x22FFFFFF);
+            p.setColor(f ? ((accent & 0x00FFFFFF) | 0x55000000) : 0x22FFFFFF);
             cv.drawCircle(cx, cy, r, p);
             p.setStyle(Paint.Style.STROKE);
             p.setStrokeWidth(Math.max(2, px(f ? 4 : 2)));
-            p.setColor(f ? ACCENT : 0xB3FFFFFF);
+            p.setColor(f ? accent : 0xB3FFFFFF);
             cv.drawCircle(cx, cy, r, p);
 
             float s = r;
@@ -409,7 +563,7 @@ public class MainActivity extends Activity {
             t.setOrientation(VERTICAL);
             t.setPadding(px(22), 0, 0, 0);
             TextView a = text("Configurações do", px(24), 0xFFDDE6F5, Typeface.DEFAULT);
-            TextView b = text("MansonLauncher", px(30), ACCENT, Typeface.DEFAULT_BOLD);
+            TextView b = text("MansonLauncher", px(30), accent, Typeface.DEFAULT_BOLD);
             t.addView(a, new LinearLayout.LayoutParams(WRAP, WRAP));
             t.addView(b, new LinearLayout.LayoutParams(WRAP, WRAP));
             addView(t, new LinearLayout.LayoutParams(WRAP, WRAP));
@@ -422,7 +576,7 @@ public class MainActivity extends Activity {
         }
 
         void look(boolean f) {
-            bg.setStroke(Math.max(1, px(f ? 4 : 1)), f ? ACCENT : 0x33FFFFFF);
+            bg.setStroke(Math.max(1, px(f ? 4 : 1)), f ? accent : 0x33FFFFFF);
             setScaleX(f ? 1.04f : 1f);
             setScaleY(f ? 1.04f : 1f);
             setTranslationZ(f ? px(12) : 0);
@@ -431,6 +585,7 @@ public class MainActivity extends Activity {
         @Override
         protected void onFocusChanged(boolean gain, int direction, Rect prev) {
             super.onFocusChanged(gain, direction, prev);
+            if (gain) navSound();
             look(gain);
         }
     }
@@ -464,7 +619,7 @@ public class MainActivity extends Activity {
 
             label = text("", px(20), Color.WHITE, Typeface.DEFAULT);
             label.setSingleLine(true);
-            label.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            label.setEllipsize(TextUtils.TruncateAt.END);
             label.setGravity(Gravity.CENTER);
             label.setPadding(px(10), 0, px(10), px(12));
             addView(label, new FrameLayout.LayoutParams(MATCH, WRAP, Gravity.BOTTOM));
@@ -504,7 +659,7 @@ public class MainActivity extends Activity {
             super.dispatchDraw(canvas);
             float sw = Math.max(1f, px((focus || pick) ? 4 : 1));
             ring.setStrokeWidth(sw);
-            ring.setColor(pick ? 0xFFFFC857 : (focus ? ACCENT : 0x33FFFFFF));
+            ring.setColor(pick ? 0xFFFFC857 : (focus ? accent : 0x33FFFFFF));
             rr.set(sw / 2f, sw / 2f, getWidth() - sw / 2f, getHeight() - sw / 2f);
             canvas.drawRoundRect(rr, px(20), px(20), ring);
         }
@@ -691,9 +846,167 @@ public class MainActivity extends Activity {
         }
     }
 
+    // ---------------- Clima ----------------
+
+    String httpGet(String u) throws Exception {
+        HttpURLConnection c = (HttpURLConnection) new URL(u).openConnection();
+        c.setConnectTimeout(8000);
+        c.setReadTimeout(8000);
+        try (InputStream in = c.getInputStream()) {
+            ByteArrayOutputStream bo = new ByteArrayOutputStream();
+            byte[] buf = new byte[8192];
+            int n;
+            while ((n = in.read(buf)) > 0) bo.write(buf, 0, n);
+            return bo.toString("UTF-8");
+        } finally {
+            c.disconnect();
+        }
+    }
+
+    void refreshWeather(boolean force) {
+        if (!prefs.getBoolean("w_on", true)) return;
+        long last = prefs.getLong("w_time", 0);
+        if (!force && System.currentTimeMillis() - last < 30 * 60 * 1000L) return;
+        final String lat = prefs.getString("city_lat", "-23.55");
+        final String lon = prefs.getString("city_lon", "-46.63");
+        new Thread(() -> {
+            try {
+                String json = httpGet("https://api.open-meteo.com/v1/forecast?latitude=" + lat
+                        + "&longitude=" + lon
+                        + "&current=temperature_2m,weather_code,is_day"
+                        + "&daily=temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=1");
+                prefs.edit().putString("w_json", json).putLong("w_time", System.currentTimeMillis()).apply();
+                ui.post(this::updateWeatherUi);
+            } catch (Exception ignored) {
+            }
+        }).start();
+    }
+
+    String fmtTemp(double c, boolean f) {
+        return Math.round(f ? c * 9.0 / 5.0 + 32.0 : c) + "°";
+    }
+
+    String describe(int c, boolean day) {
+        if (c == 0) return day ? "Céu limpo" : "Noite limpa";
+        if (c == 1) return day ? "Poucas nuvens" : "Noite com poucas nuvens";
+        if (c == 2) return "Parcialmente nublado";
+        if (c == 3) return "Nublado";
+        if (c == 45 || c == 48) return "Neblina";
+        if (c >= 51 && c <= 57) return "Garoa";
+        if ((c >= 61 && c <= 67) || (c >= 80 && c <= 82)) return "Chuva";
+        if ((c >= 71 && c <= 77) || c == 85 || c == 86) return "Neve";
+        if (c >= 95) return "Tempestade";
+        return "Tempo variável";
+    }
+
+    int iconKind(int c, boolean day) {
+        if (c == 0 || c == 1) return day ? 0 : 1;
+        if (c >= 95) return 4;
+        if ((c >= 51 && c <= 57) || (c >= 61 && c <= 67) || (c >= 80 && c <= 82)) return 3;
+        if ((c >= 71 && c <= 77) || c == 85 || c == 86) return 5;
+        return 2;
+    }
+
+    void updateWeatherUi() {
+        boolean on = prefs.getBoolean("w_on", true);
+        String json = prefs.getString("w_json", "");
+        if (!on || json.isEmpty()) {
+            weatherRow.setVisibility(View.GONE);
+            return;
+        }
+        try {
+            JSONObject jo = new JSONObject(json);
+            JSONObject cur = jo.getJSONObject("current");
+            double t = cur.getDouble("temperature_2m");
+            int code = cur.getInt("weather_code");
+            boolean day = cur.getInt("is_day") == 1;
+            JSONObject daily = jo.getJSONObject("daily");
+            double mx = daily.getJSONArray("temperature_2m_max").getDouble(0);
+            double mn = daily.getJSONArray("temperature_2m_min").getDouble(0);
+            boolean f = prefs.getBoolean("unit_f", false);
+            weatherText.setText(fmtTemp(t, f) + "   " + describe(code, day)
+                    + "   Máx. " + fmtTemp(mx, f) + "   Mín. " + fmtTemp(mn, f));
+            weatherIcon.setKind(iconKind(code, day));
+            weatherRow.setVisibility(View.VISIBLE);
+        } catch (Exception e) {
+            weatherRow.setVisibility(View.GONE);
+        }
+    }
+
+    void setCity(String name, String lat, String lon) {
+        prefs.edit().putString("city_name", name).putString("city_lat", lat).putString("city_lon", lon)
+                .remove("w_json").remove("w_time").apply();
+        updateWeatherUi();
+        refreshWeather(true);
+        Toast.makeText(this, "Cidade: " + name, Toast.LENGTH_SHORT).show();
+    }
+
+    void showCities() {
+        String[] names = new String[CITIES.length + 1];
+        for (int i = 0; i < CITIES.length; i++) names[i] = CITIES[i][0];
+        names[CITIES.length] = "Buscar outra cidade...";
+        new AlertDialog.Builder(this).setTitle("Cidade").setItems(names, (d, which) -> {
+            if (which == CITIES.length) {
+                searchCity();
+            } else {
+                setCity(CITIES[which][0], CITIES[which][1], CITIES[which][2]);
+            }
+        }).show();
+    }
+
+    void searchCity() {
+        final EditText et = new EditText(this);
+        et.setSingleLine(true);
+        et.setHint("Nome da cidade");
+        new AlertDialog.Builder(this).setTitle("Buscar cidade").setView(et)
+                .setPositiveButton("Buscar", (d, w) -> doSearch(et.getText().toString().trim()))
+                .setNegativeButton("Cancelar", null).show();
+    }
+
+    void doSearch(final String q) {
+        if (q.isEmpty()) return;
+        new Thread(() -> {
+            try {
+                String json = httpGet("https://geocoding-api.open-meteo.com/v1/search?name="
+                        + URLEncoder.encode(q, "UTF-8") + "&count=8&language=pt&format=json");
+                JSONObject jo = new JSONObject(json);
+                JSONArray rs = jo.optJSONArray("results");
+                final List<String[]> found = new ArrayList<>();
+                if (rs != null) {
+                    for (int i = 0; i < rs.length(); i++) {
+                        JSONObject r = rs.getJSONObject(i);
+                        String label = r.optString("name");
+                        if (r.has("admin1")) label += " - " + r.optString("admin1");
+                        if (r.has("country")) label += ", " + r.optString("country");
+                        found.add(new String[]{r.optString("name"),
+                                String.valueOf(r.getDouble("latitude")),
+                                String.valueOf(r.getDouble("longitude")), label});
+                    }
+                }
+                ui.post(() -> showResults(found));
+            } catch (Exception e) {
+                ui.post(() -> Toast.makeText(this, "Não foi possível buscar agora.", Toast.LENGTH_LONG).show());
+            }
+        }).start();
+    }
+
+    void showResults(final List<String[]> found) {
+        if (found.isEmpty()) {
+            Toast.makeText(this, "Nenhuma cidade encontrada.", Toast.LENGTH_LONG).show();
+            return;
+        }
+        String[] names = new String[found.size()];
+        for (int i = 0; i < names.length; i++) names[i] = found.get(i)[3];
+        new AlertDialog.Builder(this).setTitle("Escolha a cidade").setItems(names, (d, which) ->
+                setCity(found.get(which)[0], found.get(which)[1], found.get(which)[2])).show();
+    }
+
+    // ---------------- Ajustes ----------------
+
     void showSettings() {
         String[] items = {
-                "Fundo padrão (azul-marinho escuro)",
+                "Ajustes do Início (clima, cidade, tema, sons)...",
+                "Fundo padrão (do tema)",
                 "Fundo de cor lisa...",
                 "Fundo com foto: escolher arquivo...",
                 "Fundo com foto: usar a enviada pelo Termux",
@@ -706,34 +1019,81 @@ public class MainActivity extends Activity {
         new AlertDialog.Builder(this).setTitle("Ajustes").setItems(items, (d, which) -> {
             switch (which) {
                 case 0:
+                    showHomeSettings();
+                    break;
+                case 1:
                     prefs.edit().putInt("bg", 0).apply();
                     applyBackground();
                     break;
-                case 1:
+                case 2:
                     showColors();
                     break;
-                case 2:
+                case 3:
                     pickPhoto();
                     break;
-                case 3:
+                case 4:
                     usePushedPhoto();
                     break;
-                case 4:
+                case 5:
                     showCols();
                     break;
-                case 5:
+                case 6:
                     showVisible();
                     break;
-                case 6:
+                case 7:
                     startOrganize();
                     break;
-                case 7:
+                case 8:
                     prefs.edit().remove("order").apply();
                     rebuild();
                     break;
                 default:
                     showHelp("Como enviar uma foto:");
             }
+        }).show();
+    }
+
+    void showHomeSettings() {
+        final boolean wOn = prefs.getBoolean("w_on", true);
+        final boolean f = prefs.getBoolean("unit_f", false);
+        final boolean snd = prefs.getBoolean("sounds", true);
+        String[] items = {
+                "Widget de clima: " + (wOn ? "Ligado" : "Desligado"),
+                "Cidade: " + prefs.getString("city_name", "São Paulo") + "...",
+                "Temperatura: " + (f ? "°F (Fahrenheit)" : "°C (Celsius)"),
+                "Tema: " + THEME_NAMES[theme()] + "...",
+                "Sons de navegação: " + (snd ? "Ligados" : "Desligados")
+        };
+        new AlertDialog.Builder(this).setTitle("Ajustes do Início").setItems(items, (d, which) -> {
+            switch (which) {
+                case 0:
+                    prefs.edit().putBoolean("w_on", !wOn).apply();
+                    updateWeatherUi();
+                    if (!wOn) refreshWeather(false);
+                    showHomeSettings();
+                    break;
+                case 1:
+                    showCities();
+                    break;
+                case 2:
+                    prefs.edit().putBoolean("unit_f", !f).apply();
+                    updateWeatherUi();
+                    showHomeSettings();
+                    break;
+                case 3:
+                    showThemes();
+                    break;
+                default:
+                    prefs.edit().putBoolean("sounds", !snd).apply();
+                    showHomeSettings();
+            }
+        }).show();
+    }
+
+    void showThemes() {
+        new AlertDialog.Builder(this).setTitle("Tema").setItems(THEME_NAMES, (d, which) -> {
+            prefs.edit().putInt("theme", which).apply();
+            recreate();
         }).show();
     }
 
@@ -934,8 +1294,7 @@ public class MainActivity extends Activity {
                 return;
             }
         }
-        root.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{0xFF0F1B36, 0xFF08112A, 0xFF040813}));
+        root.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, THEME_BG[theme()]));
     }
 
     @Override
@@ -961,6 +1320,8 @@ public class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         ui.post(tick);
+        updateWeatherUi();
+        refreshWeather(false);
     }
 
     @Override
