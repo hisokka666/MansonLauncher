@@ -84,6 +84,7 @@ public class MainActivity extends Activity {
     static final String[] LIVE_TV_PKGS = {
             "com.mediatek.tv.oneworld.tvcenter", "com.tcl.tv", "com.google.android.tv", "com.android.tv"};
     static final String HELP_PATH = "/sdcard/Android/data/io.manson.launcher/files/wallpaper.jpg";
+    static final String[] LANG_NAMES = {"Português", "English", "Español"};
 
     static final String[] THEME_NAMES = {"Azul (padrão)", "Grafite", "Roxo", "Verde", "Vermelho"};
     static final int[] THEME_ACCENT = {0xFF2EB8FF, 0xFFB8C4D6, 0xFFB26BFF, 0xFF3BE3A1, 0xFFFF4D5A};
@@ -110,6 +111,106 @@ public class MainActivity extends Activity {
             {"São Paulo", "-23.55", "-46.63"}, {"Teresina", "-5.09", "-42.80"},
             {"Vitória", "-20.32", "-40.34"}};
 
+    // Traduções: {português, inglês, espanhol}
+    static final String[][] TR = {
+            {"SUA TV, DO SEU JEITO", "YOUR TV, YOUR WAY", "TU TV, A TU MANERA"},
+            {"Configurações do", "Settings for", "Ajustes de"},
+            {"MODO ORGANIZAR: OK pega ou solta o app · setas movem · VOLTAR termina",
+                    "ORGANIZE MODE: OK picks up or drops the app · arrows move · BACK to finish",
+                    "MODO ORGANIZAR: OK toma o suelta la app · flechas mueven · ATRÁS termina"},
+            {"Não foi possível abrir", "Could not open", "No se pudo abrir"},
+            {"Não encontrei o app de TV aberta nesta TV.", "Live TV app not found on this TV.",
+                    "No encontré la app de TV en vivo en este TV."},
+            {"Não encontrei entradas HDMI nesta TV.", "No HDMI inputs found on this TV.",
+                    "No encontré entradas HDMI en este TV."},
+            {"Entradas HDMI", "HDMI inputs", "Entradas HDMI"},
+            {"Não foi possível abrir essa entrada.", "Could not open that input.",
+                    "No se pudo abrir esa entrada."},
+            {"Não foi possível abrir as configurações da TV.", "Could not open the TV settings.",
+                    "No se pudieron abrir los ajustes del TV."},
+            {"Máx.", "High", "Máx."},
+            {"Mín.", "Low", "Mín."},
+            {"Céu limpo", "Clear sky", "Cielo despejado"},
+            {"Noite limpa", "Clear night", "Noche despejada"},
+            {"Poucas nuvens", "Few clouds", "Pocas nubes"},
+            {"Noite com poucas nuvens", "Night with few clouds", "Noche con pocas nubes"},
+            {"Parcialmente nublado", "Partly cloudy", "Parcialmente nublado"},
+            {"Nublado", "Overcast", "Nublado"},
+            {"Neblina", "Fog", "Niebla"},
+            {"Garoa", "Drizzle", "Llovizna"},
+            {"Chuva", "Rain", "Lluvia"},
+            {"Neve", "Snow", "Nieve"},
+            {"Tempestade", "Thunderstorm", "Tormenta"},
+            {"Tempo variável", "Variable weather", "Tiempo variable"},
+            {"Cidade", "City", "Ciudad"},
+            {"Buscar outra cidade...", "Search another city...", "Buscar otra ciudad..."},
+            {"Buscar cidade", "Search city", "Buscar ciudad"},
+            {"Nome da cidade", "City name", "Nombre de la ciudad"},
+            {"Buscar", "Search", "Buscar"},
+            {"Cancelar", "Cancel", "Cancelar"},
+            {"Não foi possível buscar agora.", "Could not search right now.", "No se pudo buscar ahora."},
+            {"Nenhuma cidade encontrada.", "No city found.", "No se encontró ninguna ciudad."},
+            {"Escolha a cidade", "Choose the city", "Elige la ciudad"},
+            {"Ajustes", "Settings", "Ajustes"},
+            {"Ajustes do Início (idioma, clima, cidade, sons)...",
+                    "Home settings (language, weather, city, sounds)...",
+                    "Ajustes de inicio (idioma, clima, ciudad, sonidos)..."},
+            {"Fundo e temas...", "Background and themes...", "Fondo y temas..."},
+            {"Apps por linha", "Apps per row", "Apps por fila"},
+            {"apps por linha", "apps per row", "apps por fila"},
+            {"Escolher quais apps aparecem...", "Choose which apps are shown...", "Elegir qué apps se muestran..."},
+            {"Organizar apps (mover)...", "Organize apps (move)...", "Organizar apps (mover)..."},
+            {"Restaurar ordem alfabética", "Restore alphabetical order", "Restaurar orden alfabético"},
+            {"Ajustes do Início", "Home settings", "Ajustes de inicio"},
+            {"Idioma", "Language", "Idioma"},
+            {"Widget de clima", "Weather widget", "Widget del clima"},
+            {"Ligado", "On", "Activado"},
+            {"Desligado", "Off", "Desactivado"},
+            {"Temperatura", "Temperature", "Temperatura"},
+            {"Sons de navegação", "Navigation sounds", "Sonidos de navegación"},
+            {"Ligados", "On", "Activados"},
+            {"Desligados", "Off", "Desactivados"},
+            {"Fundo e temas", "Background and themes", "Fondo y temas"},
+            {"Tema", "Theme", "Tema"},
+            {"Azul (padrão)", "Blue (default)", "Azul (predeterminado)"},
+            {"Grafite", "Graphite", "Grafito"},
+            {"Roxo", "Purple", "Morado"},
+            {"Verde", "Green", "Verde"},
+            {"Vermelho", "Red", "Rojo"},
+            {"Fundo padrão (do tema)", "Default background (from theme)", "Fondo predeterminado (del tema)"},
+            {"Fundo de cor lisa...", "Solid color background...", "Fondo de color liso..."},
+            {"Fundo com foto: escolher arquivo...", "Photo background: choose file...",
+                    "Fondo con foto: elegir archivo..."},
+            {"Fundo com foto: usar a enviada pelo Termux", "Photo background: use the one sent via Termux",
+                    "Fondo con foto: usar la enviada por Termux"},
+            {"Ajuda: enviar foto pelo Termux", "Help: send a photo via Termux", "Ayuda: enviar foto por Termux"},
+            {"Cor lisa", "Solid color", "Color liso"},
+            {"Azul marinho", "Navy blue", "Azul marino"},
+            {"Cinza", "Gray", "Gris"},
+            {"Verde petróleo", "Petrol green", "Verde petróleo"},
+            {"Preto", "Black", "Negro"},
+            {"Apps que aparecem", "Visible apps", "Apps visibles"},
+            {"Salvar", "Save", "Guardar"},
+            {"Foto de fundo", "Background photo", "Foto de fondo"},
+            {"Como enviar uma foto:", "How to send a photo:", "Cómo enviar una foto:"},
+            {"No Termux, com a TV conectada:", "In Termux, with the TV connected:",
+                    "En Termux, con el TV conectado:"},
+            {"Depois abra Ajustes > Fundo e temas e escolha: Fundo com foto: usar a enviada pelo Termux.",
+                    "Then open Settings > Background and themes and choose: Photo background: use the one sent via Termux.",
+                    "Luego abre Ajustes > Fondo y temas y elige: Fondo con foto: usar la enviada por Termux."},
+            {"Nenhuma foto enviada ainda.", "No photo sent yet.", "Aún no se envió ninguna foto."},
+            {"Esta TV não tem seletor de arquivos.", "This TV has no file picker.",
+                    "Este TV no tiene selector de archivos."},
+            {"Não foi possível usar essa foto.", "Could not use that photo.", "No se pudo usar esa foto."}
+    };
+    static final Map<String, String[]> TRMAP = new HashMap<>();
+
+    static {
+        for (String[] r : TR) {
+            TRMAP.put(r[0], new String[]{r[1], r[2]});
+        }
+    }
+
     static class Entry {
         String label;
         String pkg;
@@ -121,6 +222,7 @@ public class MainActivity extends Activity {
     SharedPreferences prefs;
     AudioManager audio;
     float k;
+    int lang = 0;
     int accent = 0xFF2EB8FF;
     int cols;
     int cardW;
@@ -150,7 +252,7 @@ public class MainActivity extends Activity {
         public void run() {
             Date now = new Date();
             clock.setText(new SimpleDateFormat("HH:mm", Locale.getDefault()).format(now));
-            date.setText(new SimpleDateFormat("EEEE, d 'de' MMMM", new Locale("pt", "BR")).format(now));
+            date.setText(new SimpleDateFormat(datePattern(), loc()).format(now));
             ui.postDelayed(this, 15000);
         }
     };
@@ -161,6 +263,29 @@ public class MainActivity extends Activity {
             loadApps();
         }
     };
+
+    String tr(String pt) {
+        if (lang == 0) return pt;
+        String[] v = TRMAP.get(pt);
+        return v == null ? pt : v[lang - 1];
+    }
+
+    Locale loc() {
+        if (lang == 1) return Locale.US;
+        if (lang == 2) return new Locale("es", "ES");
+        return new Locale("pt", "BR");
+    }
+
+    String datePattern() {
+        return lang == 1 ? "EEEE, MMMM d" : "EEEE, d 'de' MMMM";
+    }
+
+    int defaultLang() {
+        String l = Locale.getDefault().getLanguage();
+        if ("en".equals(l)) return 1;
+        if ("es".equals(l)) return 2;
+        return 0;
+    }
 
     int px(float v) {
         return Math.round(v * k);
@@ -191,6 +316,8 @@ public class MainActivity extends Activity {
         super.onCreate(state);
         prefs = getSharedPreferences("manson", MODE_PRIVATE);
         audio = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+        lang = prefs.getInt("lang", defaultLang());
+        if (lang < 0 || lang > 2) lang = 0;
         accent = THEME_ACCENT[theme()];
         k = getResources().getDisplayMetrics().widthPixels / 1920f;
         cols = prefs.getInt("cols", 5);
@@ -286,7 +413,7 @@ public class MainActivity extends Activity {
         ss.setSpan(new ForegroundColorSpan(0xFF1E8CFF), 7, 15, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         title.setText(ss);
         title.setLetterSpacing(0.16f);
-        TextView sub = text("SUA TV, DO SEU JEITO", px(16), 0xFF9AA7C0, Typeface.DEFAULT);
+        TextView sub = text(tr("SUA TV, DO SEU JEITO"), px(16), 0xFF9AA7C0, Typeface.DEFAULT);
         sub.setLetterSpacing(0.2f);
         LinearLayout.LayoutParams sublp = new LinearLayout.LayoutParams(WRAP, WRAP);
         sublp.topMargin = px(6);
@@ -344,7 +471,7 @@ public class MainActivity extends Activity {
         wlp.topMargin = px(14);
         box.addView(weatherRow, wlp);
 
-        hint = text("MODO ORGANIZAR: OK pega ou solta o app · setas movem · VOLTAR termina",
+        hint = text(tr("MODO ORGANIZAR: OK pega ou solta o app · setas movem · VOLTAR termina"),
                 px(22), 0xFFFFE08A, Typeface.DEFAULT);
         hint.setVisibility(View.GONE);
         LinearLayout.LayoutParams hlp = new LinearLayout.LayoutParams(WRAP, WRAP);
@@ -562,7 +689,7 @@ public class MainActivity extends Activity {
             LinearLayout t = new LinearLayout(c);
             t.setOrientation(VERTICAL);
             t.setPadding(px(22), 0, 0, 0);
-            TextView a = text("Configurações do", px(24), 0xFFDDE6F5, Typeface.DEFAULT);
+            TextView a = text(tr("Configurações do"), px(24), 0xFFDDE6F5, Typeface.DEFAULT);
             TextView b = text("MansonLauncher", px(30), accent, Typeface.DEFAULT_BOLD);
             t.addView(a, new LinearLayout.LayoutParams(WRAP, WRAP));
             t.addView(b, new LinearLayout.LayoutParams(WRAP, WRAP));
@@ -781,7 +908,7 @@ public class MainActivity extends Activity {
         try {
             startActivity(e.intent);
         } catch (Exception ex) {
-            Toast.makeText(this, "Não foi possível abrir " + e.label, Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, tr("Não foi possível abrir") + " " + e.label, Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -798,7 +925,7 @@ public class MainActivity extends Activity {
                 }
             }
         }
-        Toast.makeText(this, "Não encontrei o app de TV aberta nesta TV.", Toast.LENGTH_LONG).show();
+        Toast.makeText(this, tr("Não encontrei o app de TV aberta nesta TV."), Toast.LENGTH_LONG).show();
     }
 
     void openHdmi() {
@@ -813,7 +940,7 @@ public class MainActivity extends Activity {
             }
         }
         if (hdmi.isEmpty()) {
-            Toast.makeText(this, "Não encontrei entradas HDMI nesta TV.", Toast.LENGTH_LONG).show();
+            Toast.makeText(this, tr("Não encontrei entradas HDMI nesta TV."), Toast.LENGTH_LONG).show();
             return;
         }
         if (hdmi.size() == 1) {
@@ -825,7 +952,7 @@ public class MainActivity extends Activity {
             CharSequence l = hdmi.get(i).loadLabel(this);
             names[i] = (l == null || l.length() == 0) ? ("HDMI " + (i + 1)) : String.valueOf(l);
         }
-        new AlertDialog.Builder(this).setTitle("Entradas HDMI")
+        new AlertDialog.Builder(this).setTitle(tr("Entradas HDMI"))
                 .setItems(names, (d, which) -> launchInput(hdmi.get(which))).show();
     }
 
@@ -834,7 +961,7 @@ public class MainActivity extends Activity {
             startActivity(new Intent(Intent.ACTION_VIEW,
                     TvContract.buildChannelUriForPassthroughInput(info.getId())));
         } catch (Exception e) {
-            Toast.makeText(this, "Não foi possível abrir essa entrada.", Toast.LENGTH_LONG).show();
+            Toast.makeText(this, tr("Não foi possível abrir essa entrada."), Toast.LENGTH_LONG).show();
         }
     }
 
@@ -842,7 +969,7 @@ public class MainActivity extends Activity {
         try {
             startActivity(new Intent(Settings.ACTION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
         } catch (Exception e) {
-            Toast.makeText(this, "Não foi possível abrir as configurações da TV.", Toast.LENGTH_LONG).show();
+            Toast.makeText(this, tr("Não foi possível abrir as configurações da TV."), Toast.LENGTH_LONG).show();
         }
     }
 
@@ -887,16 +1014,16 @@ public class MainActivity extends Activity {
     }
 
     String describe(int c, boolean day) {
-        if (c == 0) return day ? "Céu limpo" : "Noite limpa";
-        if (c == 1) return day ? "Poucas nuvens" : "Noite com poucas nuvens";
-        if (c == 2) return "Parcialmente nublado";
-        if (c == 3) return "Nublado";
-        if (c == 45 || c == 48) return "Neblina";
-        if (c >= 51 && c <= 57) return "Garoa";
-        if ((c >= 61 && c <= 67) || (c >= 80 && c <= 82)) return "Chuva";
-        if ((c >= 71 && c <= 77) || c == 85 || c == 86) return "Neve";
-        if (c >= 95) return "Tempestade";
-        return "Tempo variável";
+        if (c == 0) return tr(day ? "Céu limpo" : "Noite limpa");
+        if (c == 1) return tr(day ? "Poucas nuvens" : "Noite com poucas nuvens");
+        if (c == 2) return tr("Parcialmente nublado");
+        if (c == 3) return tr("Nublado");
+        if (c == 45 || c == 48) return tr("Neblina");
+        if (c >= 51 && c <= 57) return tr("Garoa");
+        if ((c >= 61 && c <= 67) || (c >= 80 && c <= 82)) return tr("Chuva");
+        if ((c >= 71 && c <= 77) || c == 85 || c == 86) return tr("Neve");
+        if (c >= 95) return tr("Tempestade");
+        return tr("Tempo variável");
     }
 
     int iconKind(int c, boolean day) {
@@ -925,7 +1052,7 @@ public class MainActivity extends Activity {
             double mn = daily.getJSONArray("temperature_2m_min").getDouble(0);
             boolean f = prefs.getBoolean("unit_f", false);
             weatherText.setText(fmtTemp(t, f) + "   " + describe(code, day)
-                    + "   Máx. " + fmtTemp(mx, f) + "   Mín. " + fmtTemp(mn, f));
+                    + "   " + tr("Máx.") + " " + fmtTemp(mx, f) + "   " + tr("Mín.") + " " + fmtTemp(mn, f));
             weatherIcon.setKind(iconKind(code, day));
             weatherRow.setVisibility(View.VISIBLE);
         } catch (Exception e) {
@@ -938,14 +1065,14 @@ public class MainActivity extends Activity {
                 .remove("w_json").remove("w_time").apply();
         updateWeatherUi();
         refreshWeather(true);
-        Toast.makeText(this, "Cidade: " + name, Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, tr("Cidade") + ": " + name, Toast.LENGTH_SHORT).show();
     }
 
     void showCities() {
         String[] names = new String[CITIES.length + 1];
         for (int i = 0; i < CITIES.length; i++) names[i] = CITIES[i][0];
-        names[CITIES.length] = "Buscar outra cidade...";
-        new AlertDialog.Builder(this).setTitle("Cidade").setItems(names, (d, which) -> {
+        names[CITIES.length] = tr("Buscar outra cidade...");
+        new AlertDialog.Builder(this).setTitle(tr("Cidade")).setItems(names, (d, which) -> {
             if (which == CITIES.length) {
                 searchCity();
             } else {
@@ -957,10 +1084,10 @@ public class MainActivity extends Activity {
     void searchCity() {
         final EditText et = new EditText(this);
         et.setSingleLine(true);
-        et.setHint("Nome da cidade");
-        new AlertDialog.Builder(this).setTitle("Buscar cidade").setView(et)
-                .setPositiveButton("Buscar", (d, w) -> doSearch(et.getText().toString().trim()))
-                .setNegativeButton("Cancelar", null).show();
+        et.setHint(tr("Nome da cidade"));
+        new AlertDialog.Builder(this).setTitle(tr("Buscar cidade")).setView(et)
+                .setPositiveButton(tr("Buscar"), (d, w) -> doSearch(et.getText().toString().trim()))
+                .setNegativeButton(tr("Cancelar"), null).show();
     }
 
     void doSearch(final String q) {
@@ -985,19 +1112,19 @@ public class MainActivity extends Activity {
                 }
                 ui.post(() -> showResults(found));
             } catch (Exception e) {
-                ui.post(() -> Toast.makeText(this, "Não foi possível buscar agora.", Toast.LENGTH_LONG).show());
+                ui.post(() -> Toast.makeText(this, tr("Não foi possível buscar agora."), Toast.LENGTH_LONG).show());
             }
         }).start();
     }
 
     void showResults(final List<String[]> found) {
         if (found.isEmpty()) {
-            Toast.makeText(this, "Nenhuma cidade encontrada.", Toast.LENGTH_LONG).show();
+            Toast.makeText(this, tr("Nenhuma cidade encontrada."), Toast.LENGTH_LONG).show();
             return;
         }
         String[] names = new String[found.size()];
         for (int i = 0; i < names.length; i++) names[i] = found.get(i)[3];
-        new AlertDialog.Builder(this).setTitle("Escolha a cidade").setItems(names, (d, which) ->
+        new AlertDialog.Builder(this).setTitle(tr("Escolha a cidade")).setItems(names, (d, which) ->
                 setCity(found.get(which)[0], found.get(which)[1], found.get(which)[2])).show();
     }
 
@@ -1005,21 +1132,50 @@ public class MainActivity extends Activity {
 
     void showSettings() {
         String[] items = {
-                "Ajustes do Início (clima, cidade, tema, sons)...",
-                "Fundo padrão (do tema)",
-                "Fundo de cor lisa...",
-                "Fundo com foto: escolher arquivo...",
-                "Fundo com foto: usar a enviada pelo Termux",
-                "Apps por linha: " + cols + "...",
-                "Escolher quais apps aparecem...",
-                "Organizar apps (mover)...",
-                "Restaurar ordem alfabética",
-                "Ajuda: enviar foto pelo Termux"
+                tr("Ajustes do Início (idioma, clima, cidade, sons)..."),
+                tr("Fundo e temas..."),
+                tr("Apps por linha") + ": " + cols + "...",
+                tr("Escolher quais apps aparecem..."),
+                tr("Organizar apps (mover)..."),
+                tr("Restaurar ordem alfabética")
         };
-        new AlertDialog.Builder(this).setTitle("Ajustes").setItems(items, (d, which) -> {
+        new AlertDialog.Builder(this).setTitle(tr("Ajustes")).setItems(items, (d, which) -> {
             switch (which) {
                 case 0:
                     showHomeSettings();
+                    break;
+                case 1:
+                    showBackgrounds();
+                    break;
+                case 2:
+                    showCols();
+                    break;
+                case 3:
+                    showVisible();
+                    break;
+                case 4:
+                    startOrganize();
+                    break;
+                default:
+                    prefs.edit().remove("order").apply();
+                    rebuild();
+            }
+        }).show();
+    }
+
+    void showBackgrounds() {
+        String[] items = {
+                tr("Tema") + ": " + tr(THEME_NAMES[theme()]) + "...",
+                tr("Fundo padrão (do tema)"),
+                tr("Fundo de cor lisa..."),
+                tr("Fundo com foto: escolher arquivo..."),
+                tr("Fundo com foto: usar a enviada pelo Termux"),
+                tr("Ajuda: enviar foto pelo Termux")
+        };
+        new AlertDialog.Builder(this).setTitle(tr("Fundo e temas")).setItems(items, (d, which) -> {
+            switch (which) {
+                case 0:
+                    showThemes();
                     break;
                 case 1:
                     prefs.edit().putInt("bg", 0).apply();
@@ -1034,21 +1190,8 @@ public class MainActivity extends Activity {
                 case 4:
                     usePushedPhoto();
                     break;
-                case 5:
-                    showCols();
-                    break;
-                case 6:
-                    showVisible();
-                    break;
-                case 7:
-                    startOrganize();
-                    break;
-                case 8:
-                    prefs.edit().remove("order").apply();
-                    rebuild();
-                    break;
                 default:
-                    showHelp("Como enviar uma foto:");
+                    showHelp(tr("Como enviar uma foto:"));
             }
         }).show();
     }
@@ -1058,30 +1201,30 @@ public class MainActivity extends Activity {
         final boolean f = prefs.getBoolean("unit_f", false);
         final boolean snd = prefs.getBoolean("sounds", true);
         String[] items = {
-                "Widget de clima: " + (wOn ? "Ligado" : "Desligado"),
-                "Cidade: " + prefs.getString("city_name", "São Paulo") + "...",
-                "Temperatura: " + (f ? "°F (Fahrenheit)" : "°C (Celsius)"),
-                "Tema: " + THEME_NAMES[theme()] + "...",
-                "Sons de navegação: " + (snd ? "Ligados" : "Desligados")
+                tr("Idioma") + ": " + LANG_NAMES[lang] + "...",
+                tr("Widget de clima") + ": " + (wOn ? tr("Ligado") : tr("Desligado")),
+                tr("Cidade") + ": " + prefs.getString("city_name", "São Paulo") + "...",
+                tr("Temperatura") + ": " + (f ? "°F (Fahrenheit)" : "°C (Celsius)"),
+                tr("Sons de navegação") + ": " + (snd ? tr("Ligados") : tr("Desligados"))
         };
-        new AlertDialog.Builder(this).setTitle("Ajustes do Início").setItems(items, (d, which) -> {
+        new AlertDialog.Builder(this).setTitle(tr("Ajustes do Início")).setItems(items, (d, which) -> {
             switch (which) {
                 case 0:
+                    showLanguages();
+                    break;
+                case 1:
                     prefs.edit().putBoolean("w_on", !wOn).apply();
                     updateWeatherUi();
                     if (!wOn) refreshWeather(false);
                     showHomeSettings();
                     break;
-                case 1:
+                case 2:
                     showCities();
                     break;
-                case 2:
+                case 3:
                     prefs.edit().putBoolean("unit_f", !f).apply();
                     updateWeatherUi();
                     showHomeSettings();
-                    break;
-                case 3:
-                    showThemes();
                     break;
                 default:
                     prefs.edit().putBoolean("sounds", !snd).apply();
@@ -1090,8 +1233,17 @@ public class MainActivity extends Activity {
         }).show();
     }
 
+    void showLanguages() {
+        new AlertDialog.Builder(this).setTitle(tr("Idioma")).setItems(LANG_NAMES, (d, which) -> {
+            prefs.edit().putInt("lang", which).apply();
+            recreate();
+        }).show();
+    }
+
     void showThemes() {
-        new AlertDialog.Builder(this).setTitle("Tema").setItems(THEME_NAMES, (d, which) -> {
+        String[] names = new String[THEME_NAMES.length];
+        for (int i = 0; i < names.length; i++) names[i] = tr(THEME_NAMES[i]);
+        new AlertDialog.Builder(this).setTitle(tr("Tema")).setItems(names, (d, which) -> {
             prefs.edit().putInt("theme", which).apply();
             recreate();
         }).show();
@@ -1106,9 +1258,9 @@ public class MainActivity extends Activity {
             checked[i] = !hidden.contains(all.get(i).pkg);
         }
         new AlertDialog.Builder(this)
-                .setTitle("Apps que aparecem")
+                .setTitle(tr("Apps que aparecem"))
                 .setMultiChoiceItems(names, checked, (d, which, isChecked) -> checked[which] = isChecked)
-                .setPositiveButton("Salvar", (d, w) -> {
+                .setPositiveButton(tr("Salvar"), (d, w) -> {
                     Set<String> h = new HashSet<>();
                     for (int i = 0; i < n; i++) {
                         if (!checked[i]) h.add(all.get(i).pkg);
@@ -1118,7 +1270,7 @@ public class MainActivity extends Activity {
                     selected = 0;
                     rebuild();
                 })
-                .setNegativeButton("Cancelar", null)
+                .setNegativeButton(tr("Cancelar"), null)
                 .show();
     }
 
@@ -1192,7 +1344,9 @@ public class MainActivity extends Activity {
     }
 
     void showColors() {
-        new AlertDialog.Builder(this).setTitle("Cor lisa").setItems(SOLID_NAMES, (d, which) -> {
+        String[] names = new String[SOLID_NAMES.length];
+        for (int i = 0; i < names.length; i++) names[i] = tr(SOLID_NAMES[i]);
+        new AlertDialog.Builder(this).setTitle(tr("Cor lisa")).setItems(names, (d, which) -> {
             prefs.edit().putInt("bg", 1).putInt("color", which).apply();
             applyBackground();
         }).show();
@@ -1200,8 +1354,8 @@ public class MainActivity extends Activity {
 
     void showCols() {
         String[] names = new String[COLS.length];
-        for (int i = 0; i < COLS.length; i++) names[i] = COLS[i] + " apps por linha";
-        new AlertDialog.Builder(this).setTitle("Apps por linha").setItems(names, (d, which) -> {
+        for (int i = 0; i < COLS.length; i++) names[i] = COLS[i] + " " + tr("apps por linha");
+        new AlertDialog.Builder(this).setTitle(tr("Apps por linha")).setItems(names, (d, which) -> {
             cols = COLS[which];
             prefs.edit().putInt("cols", cols).apply();
             selected = 0;
@@ -1213,9 +1367,10 @@ public class MainActivity extends Activity {
 
     void showHelp(String intro) {
         new AlertDialog.Builder(this)
-                .setTitle("Foto de fundo")
-                .setMessage(intro + "\n\nNo Termux, com a TV conectada:\n\nadb push foto.jpg "
-                        + HELP_PATH + "\n\nDepois abra Ajustes e escolha: Fundo com foto: usar a enviada pelo Termux.")
+                .setTitle(tr("Foto de fundo"))
+                .setMessage(intro + "\n\n" + tr("No Termux, com a TV conectada:")
+                        + "\n\nadb push foto.jpg " + HELP_PATH + "\n\n"
+                        + tr("Depois abra Ajustes > Fundo e temas e escolha: Fundo com foto: usar a enviada pelo Termux."))
                 .setPositiveButton("OK", null)
                 .show();
     }
@@ -1225,7 +1380,7 @@ public class MainActivity extends Activity {
             prefs.edit().putInt("bg", 2).apply();
             applyBackground();
         } else {
-            showHelp("Nenhuma foto enviada ainda.");
+            showHelp(tr("Nenhuma foto enviada ainda."));
         }
     }
 
@@ -1236,7 +1391,7 @@ public class MainActivity extends Activity {
         try {
             startActivityForResult(i, REQ_PICK);
         } catch (ActivityNotFoundException e) {
-            showHelp("Esta TV não tem seletor de arquivos.");
+            showHelp(tr("Esta TV não tem seletor de arquivos."));
         }
     }
 
@@ -1252,7 +1407,7 @@ public class MainActivity extends Activity {
             prefs.edit().putInt("bg", 2).apply();
             applyBackground();
         } catch (Exception e) {
-            Toast.makeText(this, "Não foi possível usar essa foto.", Toast.LENGTH_LONG).show();
+            Toast.makeText(this, tr("Não foi possível usar essa foto."), Toast.LENGTH_LONG).show();
         }
     }
 
